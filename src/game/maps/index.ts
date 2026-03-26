@@ -1,12 +1,8 @@
 import { GameMap } from '../types';
-import { warehouseMap } from './warehouse';
-import { parkMap } from './park';
-import { mazeMap } from './maze';
+import { arenaMap } from './arena';
 
 export const maps: Record<string, GameMap> = {
-  warehouse: warehouseMap,
-  park: parkMap,
-  maze: mazeMap,
+  arena: arenaMap,
 };
 
 export const mapList = Object.values(maps);
