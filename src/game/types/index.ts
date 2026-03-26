@@ -1,4 +1,6 @@
 export type Difficulty = 'easy' | 'normal' | 'hard';
+export type GameMode = 'last_survivor' | 'first_caught';
+export type VisionMode = 'normal' | 'blackout';
 
 export interface Position {
   x: number;
@@ -13,9 +15,9 @@ export interface Size {
 export enum TileType {
   FLOOR = 0,
   WALL = 1,
-  BOX = 2,           // 장애물 (이동 불가)
-  ELEVATED = 3,      // 높은 지형 (플레이어만 올라갈 수 있음, hard 좀비는 가능)
-  ITEM_SPAWN = 4,    // 아이템 스폰 위치 (바닥과 동일하게 이동 가능)
+  BOX = 2,
+  ELEVATED = 3,
+  ITEM_SPAWN = 4,
 }
 
 export interface GameMap {
@@ -26,7 +28,7 @@ export interface GameMap {
   rows: number;
   tileSize: number;
   tiles: TileType[][];
-  playerSpawn: Position;
+  playerSpawns: Position[];  // multiple spawn points
   zombieSpawns: Position[];
   itemSpawns: Position[];
   description: string;
@@ -41,9 +43,22 @@ export interface Entity {
 }
 
 export interface Player extends Entity {
+  name: string;
+  color: string;
   onElevated: boolean;
+  elevatedTime: number;       // how long on elevated (for penalty)
   speedBoostTimer: number;
   baseSpeed: number;
+  shieldAvailable: boolean;
+  shieldActive: boolean;
+  shieldTimer: number;
+  stunTimer: number;          // webbed/stunned
+  slowTimer: number;          // slowed by web
+  facingX: number;            // last movement direction
+  facingY: number;
+  walkCycle: number;          // animation cycle
+  deathTime: number;          // when this player died (for ordering)
+  playerIndex: number;        // for input binding
 }
 
 export interface Zombie extends Entity {
@@ -51,6 +66,27 @@ export interface Zombie extends Entity {
   canClimb: boolean;
   slowTimer: number;
   baseSpeed: number;
+  // Stuck detection
+  prevPosition: Position;
+  stuckTime: number;
+  escapeAngle: number;
+  escapeTimer: number;
+  // Skill
+  hasWebSkill: boolean;
+  webCooldown: number;
+  webChargeTimer: number;     // >0 means charging (telegraph)
+  webTargetDir: Position | null;
+  walkCycle: number;
+  facingX: number;
+  facingY: number;
+}
+
+export interface Projectile {
+  id: string;
+  position: Position;
+  velocity: Position;
+  lifetime: number;
+  type: 'web';
 }
 
 export interface Item {
@@ -70,16 +106,23 @@ export interface GameSettings {
   mapId: string;
   zombieCount: number;
   difficulty: Difficulty;
+  gameMode: GameMode;
+  visionMode: VisionMode;
+  playerCount: number;
+  playerNames: string[];
 }
 
 export interface GameState {
   phase: 'menu' | 'playing' | 'paused' | 'gameover';
-  player: Player;
+  players: Player[];
   zombies: Zombie[];
+  projectiles: Projectile[];
   items: Item[];
   map: GameMap;
   settings: GameSettings;
   survivalTime: number;
   score: number;
   elapsedSinceLastSpawn: number;
+  winner: string | null;
+  caughtPlayer: string | null;
 }

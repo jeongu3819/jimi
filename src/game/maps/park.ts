@@ -35,7 +35,9 @@ export const parkMap: GameMap = {
     [W,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,W],
     [W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W],
   ],
-  playerSpawn: { x: 12, y: 9 },
+  playerSpawns: [
+    { x: 12, y: 9 }, { x: 2, y: 2 }, { x: 22, y: 16 }, { x: 22, y: 2 },
+  ],
   zombieSpawns: [
     { x: 1, y: 1 }, { x: 23, y: 1 }, { x: 1, y: 17 }, { x: 23, y: 17 },
     { x: 1, y: 9 }, { x: 23, y: 9 }, { x: 12, y: 1 }, { x: 12, y: 17 },

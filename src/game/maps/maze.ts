@@ -35,7 +35,9 @@ export const mazeMap: GameMap = {
     [W,_,_,_,W,_,_,_,_,_,_,_,_,_,_,_,_,_,_,W,_,_,_,_,W],
     [W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W],
   ],
-  playerSpawn: { x: 12, y: 9 },
+  playerSpawns: [
+    { x: 12, y: 9 }, { x: 1, y: 1 }, { x: 23, y: 17 }, { x: 1, y: 17 },
+  ],
   zombieSpawns: [
     { x: 1, y: 1 }, { x: 23, y: 1 }, { x: 1, y: 17 }, { x: 23, y: 17 },
     { x: 1, y: 9 }, { x: 23, y: 9 }, { x: 12, y: 1 }, { x: 12, y: 17 },

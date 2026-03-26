@@ -35,7 +35,9 @@ export const warehouseMap: GameMap = {
     [W,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,W],
     [W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W],
   ],
-  playerSpawn: { x: 12, y: 9 },
+  playerSpawns: [
+    { x: 12, y: 9 }, { x: 3, y: 3 }, { x: 21, y: 15 }, { x: 3, y: 15 },
+  ],
   zombieSpawns: [
     { x: 1, y: 1 }, { x: 23, y: 1 }, { x: 1, y: 17 }, { x: 23, y: 17 },
     { x: 12, y: 1 }, { x: 12, y: 17 }, { x: 1, y: 9 }, { x: 23, y: 9 },
