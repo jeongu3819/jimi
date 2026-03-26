@@ -1,19 +1,12 @@
-import { Player, Position, TileType, GameMap, BaseWall, GunStats } from '../types';
+import { Player, Position, TileType, GameMap } from '../types';
 
 const PLAYER_SIZE = 22;
-const PLAYER_BASE_SPEED = 140;
-const SHIELD_DURATION = 2.5;
+const PLAYER_BASE_SPEED = 155;
+const CLIMB_DURATION = 0.6;
 const PLAYER_COLORS = ['#4a9eff', '#44dd55', '#ff77aa', '#ffaa33', '#cc88ff'];
 
-const DEFAULT_GUN: GunStats = {
-  damage: 15,
-  fireRate: 0.4,
-  bulletCount: 1,
-  range: 220,
-};
-
 export function createPlayer(
-  spawnPos: Position, tileSize: number, name: string, index: number, baseIndex: number = -1
+  spawnPos: Position, tileSize: number, name: string, index: number
 ): Player {
   return {
     id: `player_${index}`,
@@ -27,46 +20,47 @@ export function createPlayer(
     speed: PLAYER_BASE_SPEED,
     baseSpeed: PLAYER_BASE_SPEED,
     alive: true,
-    hp: 100,
-    maxHp: 100,
-    baseIndex, // -1 = no base yet
-    gun: { ...DEFAULT_GUN },
-    shootCooldown: 0,
+    elevation: 0,
+    isClimbing: false,
+    climbProgress: 0,
+    climbFrom: { x: 0, y: 0 },
+    climbTo: { x: 0, y: 0 },
+    climbTargetElevation: 0,
     facingAngle: 0,
     facingX: 0,
     facingY: 1,
     walkCycle: 0,
     deathTime: 0,
     playerIndex: index,
-    shieldAvailable: true,
-    shieldActive: false,
-    shieldTimer: 0,
-    speedBoostTimer: 0,
     damageFlash: 0,
   };
 }
 
 export function updatePlayer(
-  player: Player, dx: number, dy: number, dt: number,
-  map: GameMap, baseWalls: BaseWall[]
+  player: Player, dx: number, dy: number, dt: number, map: GameMap
 ): Player {
   if (!player.alive) return player;
   const p = { ...player };
 
-  // Timers
-  if (p.shieldTimer > 0) {
-    p.shieldTimer -= dt;
-    if (p.shieldTimer <= 0) { p.shieldTimer = 0; p.shieldActive = false; }
-  }
-  if (p.speedBoostTimer > 0) {
-    p.speedBoostTimer -= dt;
-    if (p.speedBoostTimer <= 0) p.speedBoostTimer = 0;
-  }
-  if (p.shootCooldown > 0) p.shootCooldown -= dt;
   if (p.damageFlash > 0) p.damageFlash -= dt;
 
-  const effectiveSpeed = p.baseSpeed * (p.speedBoostTimer > 0 ? 1.5 : 1);
-  p.speed = effectiveSpeed;
+  // Climbing animation
+  if (p.isClimbing) {
+    p.climbProgress += dt / CLIMB_DURATION;
+    if (p.climbProgress >= 1) {
+      p.isClimbing = false;
+      p.climbProgress = 0;
+      p.position = { ...p.climbTo };
+      p.elevation = p.climbTargetElevation;
+    } else {
+      const t = p.climbProgress;
+      p.position = {
+        x: p.climbFrom.x + (p.climbTo.x - p.climbFrom.x) * t,
+        y: p.climbFrom.y + (p.climbTo.y - p.climbFrom.y) * t,
+      };
+    }
+    return p;
+  }
 
   if (dx !== 0 || dy !== 0) {
     p.facingX = dx;
@@ -75,71 +69,84 @@ export function updatePlayer(
     p.walkCycle += dt * 10;
   }
 
-  const moveX = dx * effectiveSpeed * dt;
-  const moveY = dy * effectiveSpeed * dt;
+  p.speed = p.baseSpeed;
+  const ts = map.tileSize;
 
-  const nx = p.position.x + moveX;
-  if (!collidesAny(nx, p.position.y, p.size.width, p.size.height, map, baseWalls, p.baseIndex)) {
-    p.position.x = nx;
+  // Move X
+  const moveX = dx * p.speed * dt;
+  if (moveX !== 0) {
+    const nx = p.position.x + moveX;
+    if (!collidesMap(nx, p.position.y, p.size.width, p.size.height, map, p.elevation)) {
+      p.position.x = nx;
+    } else if (tryStartClimb(p, dx, 0, map, ts)) {
+      return p;
+    }
   }
-  const ny = p.position.y + moveY;
-  if (!collidesAny(p.position.x, ny, p.size.width, p.size.height, map, baseWalls, p.baseIndex)) {
-    p.position.y = ny;
+
+  // Move Y
+  const moveY = dy * p.speed * dt;
+  if (moveY !== 0) {
+    const ny = p.position.y + moveY;
+    if (!collidesMap(p.position.x, ny, p.size.width, p.size.height, map, p.elevation)) {
+      p.position.y = ny;
+    } else if (tryStartClimb(p, 0, dy, map, ts)) {
+      return p;
+    }
   }
+
+  // Update elevation after move (drop down if on lower tile)
+  const centerCol = Math.floor((p.position.x + p.size.width / 2) / ts);
+  const centerRow = Math.floor((p.position.y + p.size.height / 2) / ts);
+  const tileH = getHeight(map, centerCol, centerRow);
+  if (tileH < p.elevation) p.elevation = tileH;
 
   return p;
 }
 
-export function activateShield(player: Player): Player {
-  if (!player.shieldAvailable || player.shieldActive || !player.alive) return player;
-  return { ...player, shieldAvailable: false, shieldActive: true, shieldTimer: SHIELD_DURATION };
+function tryStartClimb(p: Player, dx: number, dy: number, map: GameMap, ts: number): boolean {
+  const cx = p.position.x + p.size.width / 2;
+  const cy = p.position.y + p.size.height / 2;
+  const col = Math.floor(cx / ts) + (dx > 0 ? 1 : dx < 0 ? -1 : 0);
+  const row = Math.floor(cy / ts) + (dy > 0 ? 1 : dy < 0 ? -1 : 0);
+
+  if (col < 0 || col >= map.cols || row < 0 || row >= map.rows) return false;
+  if (map.tiles[row][col] === TileType.WALL) return false;
+
+  const targetH = map.heights[row][col];
+  if (targetH === p.elevation + 1) {
+    p.isClimbing = true;
+    p.climbProgress = 0;
+    p.climbFrom = { ...p.position };
+    p.climbTo = {
+      x: col * ts + ts / 2 - p.size.width / 2,
+      y: row * ts + ts / 2 - p.size.height / 2,
+    };
+    p.climbTargetElevation = targetH;
+    return true;
+  }
+  return false;
 }
 
-export function damagePlayer(player: Player, amount: number): Player {
-  if (player.shieldActive || !player.alive) return player;
-  const hp = Math.max(0, player.hp - amount);
-  return { ...player, hp, alive: hp > 0, damageFlash: 0.3 };
+function getHeight(map: GameMap, col: number, row: number): number {
+  if (col < 0 || col >= map.cols || row < 0 || row >= map.rows) return 0;
+  return map.heights[row][col];
 }
 
-export function healPlayer(player: Player, amount: number): Player {
-  return { ...player, hp: Math.min(player.maxHp, player.hp + amount) };
-}
-
-export function upgradeGunDamage(player: Player): Player {
-  return { ...player, gun: { ...player.gun, damage: player.gun.damage + 5 } };
-}
-
-export function upgradeGunRate(player: Player): Player {
-  return {
-    ...player,
-    gun: { ...player.gun, fireRate: Math.max(0.12, player.gun.fireRate - 0.06) },
-  };
-}
-
-function collidesAny(
+function collidesMap(
   x: number, y: number, w: number, h: number,
-  map: GameMap, baseWalls: BaseWall[], playerBaseIndex: number
+  map: GameMap, elevation: number
 ): boolean {
-  const { tileSize, tiles, cols, rows } = map;
+  const { tileSize, tiles, cols, rows, heights } = map;
   const pts = [
     { px: x + 2, py: y + 2 }, { px: x + w - 2, py: y + 2 },
     { px: x + 2, py: y + h - 2 }, { px: x + w - 2, py: y + h - 2 },
   ];
-
   for (const { px, py } of pts) {
     const col = Math.floor(px / tileSize);
     const row = Math.floor(py / tileSize);
     if (col < 0 || col >= cols || row < 0 || row >= rows) return true;
     if (tiles[row][col] === TileType.WALL) return true;
-
-    // Check base walls - players can pass through their own door, or any door if no base yet
-    for (const bw of baseWalls) {
-      if (bw.destroyed) continue;
-      if (bw.tilePos.x === col && bw.tilePos.y === row) {
-        if (bw.isDoor && (playerBaseIndex === -1 || bw.baseIndex === playerBaseIndex)) continue;
-        return true;
-      }
-    }
+    if (heights[row][col] > elevation) return true;
   }
   return false;
 }

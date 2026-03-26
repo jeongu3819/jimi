@@ -1,6 +1,5 @@
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type GameMode = 'last_survivor' | 'first_caught';
-export type VisionMode = 'normal' | 'blackout';
 
 export interface Position { x: number; y: number; }
 export interface Size { width: number; height: number; }
@@ -10,6 +9,8 @@ export enum TileType {
   WALL = 1,
 }
 
+export type ZombieTier = 0 | 1 | 2;
+
 export interface GameMap {
   id: string;
   name: string;
@@ -18,37 +19,10 @@ export interface GameMap {
   rows: number;
   tileSize: number;
   tiles: TileType[][];
-  baseConfigs: BaseConfig[];
-  playerStartPositions: Position[];  // all players start near center
-  centerSpawn: Position;
+  heights: number[][];      // elevation per tile (0, 1, 2)
+  playerStartPositions: Position[];
   edgeSpawns: Position[];
-  itemSpawnArea: { minX: number; maxX: number; minY: number; maxY: number };
   description: string;
-}
-
-export interface BaseConfig {
-  wallTiles: Position[];
-  doorTile: Position;
-  doorDir: 'up' | 'down' | 'left' | 'right';
-  spawnPos: Position;
-  center: Position;
-}
-
-export interface BaseWall {
-  id: string;
-  tilePos: Position;
-  hp: number;
-  maxHp: number;
-  destroyed: boolean;
-  isDoor: boolean;
-  baseIndex: number;
-}
-
-export interface GunStats {
-  damage: number;
-  fireRate: number;
-  bulletCount: number;
-  range: number;
 }
 
 export interface Player {
@@ -60,21 +34,18 @@ export interface Player {
   speed: number;
   baseSpeed: number;
   alive: boolean;
-  hp: number;
-  maxHp: number;
-  baseIndex: number;
-  gun: GunStats;
-  shootCooldown: number;
+  elevation: number;
+  isClimbing: boolean;
+  climbProgress: number;
+  climbFrom: Position;
+  climbTo: Position;
+  climbTargetElevation: number;
   facingAngle: number;
   facingX: number;
   facingY: number;
   walkCycle: number;
   deathTime: number;
   playerIndex: number;
-  shieldAvailable: boolean;
-  shieldActive: boolean;
-  shieldTimer: number;
-  speedBoostTimer: number;
   damageFlash: number;
 }
 
@@ -85,11 +56,13 @@ export interface Zombie {
   speed: number;
   baseSpeed: number;
   alive: boolean;
-  hp: number;
-  maxHp: number;
-  type: Difficulty;
-  targetWallId: string | null;
-  attackCooldown: number;
+  tier: ZombieTier;
+  elevation: number;
+  isClimbing: boolean;
+  climbProgress: number;
+  climbFrom: Position;
+  climbTo: Position;
+  climbTargetElevation: number;
   walkCycle: number;
   facingX: number;
   facingY: number;
@@ -97,40 +70,13 @@ export interface Zombie {
   stuckTime: number;
   escapeAngle: number;
   escapeTimer: number;
-}
-
-export interface Bullet {
-  id: string;
-  position: Position;
-  velocity: Position;
-  damage: number;
-  lifetime: number;
-  ownerId: string;
-  piercing: boolean;
-  hitIds: Set<string>;
-}
-
-export enum ItemType {
-  GUN_DAMAGE = 'gun_damage',
-  GUN_RATE = 'gun_rate',
-  WALL_REPAIR = 'wall_repair',
-  HEALTH_PACK = 'health_pack',
-}
-
-export interface Item {
-  id: string;
-  position: Position;
-  type: ItemType;
-  collected: boolean;
-  lifetime: number;
+  mergeTimer: number;
 }
 
 export interface GameSettings {
   mapId: string;
-  zombieCount: number;
   difficulty: Difficulty;
   gameMode: GameMode;
-  visionMode: VisionMode;
   playerCount: number;
   playerNames: string[];
 }
@@ -139,18 +85,14 @@ export interface GameState {
   phase: 'menu' | 'playing' | 'paused' | 'gameover';
   players: Player[];
   zombies: Zombie[];
-  bullets: Bullet[];
-  items: Item[];
-  baseWalls: BaseWall[];
-  baseOwners: (string | null)[];  // baseIndex -> player id (null = unclaimed)
   map: GameMap;
   settings: GameSettings;
   survivalTime: number;
-  prepTime: number;               // countdown before zombies (starts at 5)
+  prepTime: number;
   wave: number;
-  zombiesKilled: number;
+  lightLevel: number;       // 1.0 = bright, 0.0 = dark
+  lightRadius: number;      // player vision radius in px
   elapsedSinceLastSpawn: number;
-  elapsedSinceLastItem: number;
   winner: string | null;
   caughtPlayer: string | null;
 }
